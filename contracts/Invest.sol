@@ -1,32 +1,20 @@
 pragma solidity ^0.4.23;
 
-contract ERC20Interface {
-function totalSupply() public constant returns (uint);
+import "./ERC20.sol";
 
-function balanceOf(address tokenOwner) public constant returns (uint balance);
-
-function allowance(address tokenOwner, address spender) public constant returns (uint remaining);
-
-function transfer(address to, uint tokens) public returns (bool success);
-
-function approve(address spender, uint tokens) public returns (bool success);
-
-function transferFrom(address from, address to, uint tokens) public returns (bool success);
-
-event Transfer(address indexed from, address indexed to, uint tokens);
-event Approval(address indexed tokenOwner, address indexed spender, uint tokens);
-}
-
-contract Identity{
+contract Invest{
 
     /*
     *   Storage
     */
+    ERC20 myToken;
     address public owner;
     uint public contractBalance;
+    uint public contractTokenBalance;
     Profile[] public profileArray;
     uint public totalUsers = 0;
     bool private reentrancy_lock = false;
+    address public tokenContractAddress = 0xe500E70daEbAF0e6CD5a90af221473B132C4e881;
 
     // enum AgreementStatus {
     //     Pending,
@@ -55,6 +43,12 @@ contract Identity{
         address indexed userAddress, 
         uint userBalance, 
         uint userEtherPaidOut
+    );
+    event contractTokenBalanceEvent(
+        address indexed contractAddress, 
+        uint oldContractTokenBalance, 
+        uint newContractTokenBalance,
+        uint difference
     );
     /*
     * Modifiers
@@ -98,7 +92,7 @@ contract Identity{
         totalUsers += 1;
     }   
     
-    function transact(address token)
+    function transact()
     payable
     nonReentrant
     external 
@@ -106,8 +100,8 @@ contract Identity{
         //make a search index function that returns index.
         for(uint i = 0; i <= profileArray.length; i++){
             if(profileArray[i].userAddress == msg.sender){
-                ercTokenBalances(token);
-                if(profileArray[i].userBalance + msg.value >= 1000000000000000000){
+                uint value = ercTokenBalances();
+                if(profileArray[i].userBalance + value >= 100){
                     msg.sender.transfer(1000000000000000000);
                     profileArray[i].userBalance = 0;
                     profileArray[i].userEtherPaidOut += 1000000000000000000;
@@ -119,7 +113,7 @@ contract Identity{
                     return;
                 }
                 else{
-                    profileArray[i].userBalance += msg.value; //difference;
+                    profileArray[i].userBalance += value;
                     emit profileDetailStrings(
                         msg.sender, 
                         profileArray[i].userBalance, 
@@ -131,16 +125,30 @@ contract Identity{
         }
         
     }
-    function ercTokenBalances(address token) internal returns(uint){
+    function ercTokenBalances() internal returns(uint){
         //For ERC20 tokens
-         //ERC20 token = ERC20();
-        uint _newBalance = ERC20Interface(token).balanceOf(msg.sender);
-        uint _difference = _newBalance - contractBalance;
-        contractBalance += _difference;
+        ERC20 t = ERC20(tokenContractAddress);
+        uint _newBalance = t.balanceOf(address(this));
+        uint _difference = _newBalance - contractTokenBalance;  
+        contractTokenBalance += _difference;
+        
+        // emit contractTokenBalanceEvent(
+        //     owner, 
+        //     contractTokenBalance, 
+        //     _newBalance, 
+        //     _difference);
         return _difference;
     }
-
+    function findBalanceOfUser(address userAddress) public view  returns(uint){
+        ERC20 t = ERC20(tokenContractAddress);
+        return t.balanceOf(userAddress);
+    }
+    function transferTokensOut() isOwner external {
+        ERC20 t = ERC20(tokenContractAddress);
+        t.transfer(owner, contractTokenBalance);
+    }
+    function transferEtherOut() isOwner external{
+        owner.transfer(contractBalance);
+    }
 }
-
-
 
